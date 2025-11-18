@@ -1,0 +1,22 @@
+# Fichiers de build Rust
+/target/
+
+# Fichiers temporaires et logs
+*.log
+*.tmp
+
+# Fichiers système macOS
+.DS_Store
+Thumbs.db
+
+# Fichiers de configuration d'éditeur
+.vscode/
+.idea/
+
+# Fichiers générés par l'application (base de données, mots de passe chiffrés)
+passwords.enc
+passwords.txt
+passwords.json
+
+# Sauvegardes éventuelles
+**/*.rs.bk
