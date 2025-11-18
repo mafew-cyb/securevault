@@ -1,5 +1,5 @@
 use crate::models::HistoryEntry;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Write};
 use chrono::Utc;
 use uuid::Uuid;
@@ -15,7 +15,7 @@ impl HistoryManager {
             id: Uuid::new_v4().to_string(),
             action: action.to_string(),
             service: service.to_string(),
-            timestamp: Utc::now(),
+            timestamp: Utc::now().timestamp(),
         };
         history.push(entry);
         Self::save_history(&history)?;

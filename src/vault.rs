@@ -1,94 +1,114 @@
 use crate::models::ServiceInfo;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
-use aes_gcm::{Aes256Gcm, Key, Nonce};
-use aes_gcm::aead::{Aead, NewAead};
-use sha2::{Sha256, Digest};
-use base64::{encode, decode};
+use serde_json;
+use std::fs;
+use std::path::Path;
+use aes_gcm::{Aes256Gcm, KeyInit, aead::{Aead, generic_array::GenericArray}};
+use pbkdf2::pbkdf2_hmac;
+use sha2::Sha256;
+use rand::RngCore;
+use rand::rngs::OsRng;
 use uuid::Uuid;
 
-const FILE_NAME: &str = "passwords.enc";
+const SALT: &[u8] = b"securevault_salt_2023";
+const ITERATIONS: u32 = 100_000;
 
-pub fn derive_key(master_password: &str) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(master_password.as_bytes());
-    let result = hasher.finalize();
-    let mut key = [0u8; 32];
-    key.copy_from_slice(&result);
-    key
+fn derive_key(master_password: &str) -> Result<Vec<u8>, String> {
+    let mut key = vec![0u8; 32];
+    pbkdf2_hmac::<Sha256>(
+        master_password.as_bytes(),
+        SALT,
+        ITERATIONS,
+        &mut key,
+    );
+    Ok(key)
 }
 
-pub fn save_passwords(passwords: &[ServiceInfo], master_password: &str) -> Result<(), String> {
-    let key = Key::from_slice(&derive_key(master_password));
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(b"unique nonce12"); // 12 bytes
-
-    let json = serde_json::to_string(passwords).map_err(|e| e.to_string())?;
-    let ciphertext = cipher.encrypt(nonce, json.as_bytes()).map_err(|e| e.to_string())?;
-    let encoded = encode(&ciphertext);
-
-    let mut file = File::create(FILE_NAME).map_err(|e| e.to_string())?;
-    file.write_all(encoded.as_bytes()).map_err(|e| e.to_string())?;
-    Ok(())
+fn generate_nonce() -> GenericArray<u8, typenum::U12> {
+    let mut nonce = GenericArray::default();
+    OsRng.fill_bytes(&mut nonce);
+    nonce
 }
 
 pub fn load_passwords(master_password: &str) -> Result<Vec<ServiceInfo>, String> {
-    let key = Key::from_slice(&derive_key(master_password));
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(b"unique nonce12"); // 12 bytes
+    let path = Path::new("passwords.enc");
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
 
-    let mut file = match File::open(FILE_NAME) {
-        Ok(f) => f,
-        Err(_) => return Ok(Vec::new()),
-    };
-    let mut encoded = String::new();
-    file.read_to_string(&mut encoded).map_err(|e| e.to_string())?;
-    let ciphertext = decode(&encoded).map_err(|e| e.to_string())?;
-    let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|e| e.to_string())?;
-    let passwords: Vec<ServiceInfo> = serde_json::from_slice(&plaintext).map_err(|e| e.to_string())?;
-    Ok(passwords)
+    let encrypted_data = fs::read(path)
+        .map_err(|e| format!("Erreur de lecture: {}", e))?;
+
+    if encrypted_data.len() < 12 {
+        return Err("Fichier corrompu: nonce manquant".to_string());
+    }
+
+    let (nonce, ciphertext) = encrypted_data.split_at(12);
+    let nonce = GenericArray::from_slice(nonce);
+    let key = derive_key(master_password)?;
+    let cipher = Aes256Gcm::new(GenericArray::from_slice(&key));
+
+    let decrypted = cipher.decrypt(nonce, ciphertext)
+        .map_err(|e| format!("Erreur de déchiffrement: {}", e))?;
+
+    serde_json::from_slice(&decrypted)
+        .map_err(|e| format!("Erreur de désérialisation: {}", e))
 }
 
-pub fn search_passwords(passwords: &[ServiceInfo], query: &str) -> Vec<ServiceInfo> {
-    passwords
-        .iter()
-        .filter(|p| {
-            p.service.to_lowercase().contains(&query.to_lowercase())
-                || p.username.to_lowercase().contains(&query.to_lowercase())
-        })
-        .cloned()
-        .collect()
+pub fn save_passwords(passwords: &[ServiceInfo], master_password: &str) -> Result<(), String> {
+    let data = serde_json::to_vec(passwords)
+        .map_err(|e| format!("Erreur de sérialisation: {}", e))?;
+
+    let key = derive_key(master_password)?;
+    let cipher = Aes256Gcm::new(GenericArray::from_slice(&key));
+    let nonce = generate_nonce();
+
+    let encrypted = cipher.encrypt(&nonce, data.as_ref())
+        .map_err(|e| format!("Erreur de chiffrement: {}", e))?;
+
+    let mut result = nonce.to_vec();
+    result.extend(encrypted);
+
+    fs::write("passwords.enc", result)
+        .map_err(|e| format!("Erreur d'écriture: {}", e))
 }
 
 pub fn add_password(
     passwords: &mut Vec<ServiceInfo>,
-    service: &str,
-    username: &str,
-    password: &str,
-) -> Result<(), String> {
-    let entry = ServiceInfo {
+    service: String,
+    username: String,
+    password: String,
+) -> ServiceInfo {
+    let new_password = ServiceInfo {
         id: Uuid::new_v4().to_string(),
-        service: service.to_string(),
-        username: username.to_string(),
-        password: password.to_string(),
+        service,
+        username,
+        password,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
-        shared_with: Vec::new(),
     };
-    passwords.push(entry);
-    Ok(())
+
+    passwords.push(new_password.clone());
+    new_password
 }
 
-pub fn delete_password(passwords: &mut Vec<ServiceInfo>, id: &str) -> Result<(), String> {
-    passwords.retain(|p| p.id != id);
-    Ok(())
-}
-
-pub fn share_password(passwords: &mut Vec<ServiceInfo>, id: &str, username: &str) -> Result<(), String> {
-    if let Some(entry) = passwords.iter_mut().find(|p| p.id == id) {
-        if !entry.shared_with.contains(&username.to_string()) {
-            entry.shared_with.push(username.to_string());
-        }
+pub fn delete_password(
+    passwords: &mut Vec<ServiceInfo>,
+    id: &str,
+) -> Result<(), String> {
+    if let Some(index) = passwords.iter().position(|p| p.id == id) {
+        passwords.remove(index);
+        Ok(())
+    } else {
+        Err("Mot de passe non trouvé".to_string())
     }
-    Ok(())
+}
+
+pub fn search_passwords(passwords: &[ServiceInfo], query: &str) -> Vec<ServiceInfo> {
+    passwords.iter()
+        .filter(|p|
+            p.service.to_lowercase().contains(&query.to_lowercase()) ||
+            p.username.to_lowercase().contains(&query.to_lowercase())
+        )
+        .cloned()
+        .collect()
 }

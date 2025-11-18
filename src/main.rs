@@ -2,35 +2,19 @@ mod models;
 mod vault;
 mod ui;
 mod password_generator;
-mod auth;
-mod history;
 
-use ui::MyApp;
+use eframe::NativeOptions;
 
-fn main() {
-    let app = MyApp {
-        service: String::new(),
-        username: String::new(),
-        password: String::new(),
-        master_password: String::new(),
-        totp_code: String::new(),
-        passwords: Vec::new(),
-        filtered_passwords: Vec::new(),
-        search_query: String::new(),
-        error: String::new(),
-        success: String::new(),
-        unlocked: false,
-        show_generator: false,
-        generated_password: String::new(),
-        gen_length: 16,
-        gen_uppercase: true,
-        gen_numbers: true,
-        gen_symbols: true,
-        show_history: false,
-        history: Vec::new(),
-        selected_password_id: None,
-        share_username: String::new(),
+fn main() -> Result<(), eframe::Error> {
+    let options = NativeOptions {
+        initial_window_size: Some(egui::vec2(800.0, 600.0)),
+        min_window_size: Some(egui::vec2(600.0, 400.0)),
+        ..Default::default()
     };
-    let native_options = eframe::NativeOptions::default();
-    eframe::run_native(Box::new(app), native_options);
+
+    eframe::run_native(
+        "SecureVault - Gestionnaire de mots de passe",
+        options,
+        Box::new(|_cc| Box::new(ui::MyApp::default())),
+    )
 }

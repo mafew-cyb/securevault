@@ -1,6 +1,7 @@
 use sha2::{Sha256, Digest};
-use totp_lite::Totp;
 use rand::Rng;
+use base64::{engine::general_purpose, Engine as _};
+use totp_lite::{totp, Sha1};
 
 pub struct AuthManager;
 
@@ -18,15 +19,15 @@ impl AuthManager {
     pub fn generate_totp_secret() -> String {
         let mut rng = rand::thread_rng();
         let secret: Vec<u8> = (0..20).map(|_| rng.gen()).collect();
-        base64::encode(&secret)
+        general_purpose::STANDARD.encode(&secret)
     }
 
-    pub fn verify_totp(secret: &str, code: &str) -> bool {
-        let totp = Totp::new(secret.as_bytes(), 30);
-        let time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        totp.check(code, time)
+    pub fn verify_totp(secret_b64: &str, code: &str) -> bool {
+        let secret = match general_purpose::STANDARD.decode(secret_b64) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        let expected = format!("{:06}", totp::<Sha1>(&secret, 30));
+        expected == code
     }
 }

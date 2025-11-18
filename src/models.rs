@@ -1,7 +1,8 @@
 use serde::{Serialize, Deserialize};
-use chrono::{DateTime, Utc};
+use uuid::Uuid;
+use chrono::{Utc, DateTime};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceInfo {
     pub id: String,
     pub service: String,
@@ -9,21 +10,18 @@ pub struct ServiceInfo {
     pub password: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    pub shared_with: Vec<String>, // Liste des utilisateurs avec qui c'est partagé
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct HistoryEntry {
-    pub id: String,
-    pub action: String, // "created", "updated", "deleted", "accessed"
-    pub service: String,
-    pub timestamp: DateTime<Utc>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct User {
-    pub username: String,
-    pub master_password_hash: String,
-    pub totp_secret: Option<String>, // Pour 2FA
-    pub created_at: DateTime<Utc>,
+impl Default for ServiceInfo {
+    fn default() -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            service: String::new(),
+            username: String::new(),
+            password: String::new(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
 }

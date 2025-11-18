@@ -1,49 +1,61 @@
 use rand::Rng;
 
-pub struct PasswordGenerator;
+pub struct PasswordGenerator {
+    length: usize,
+    uppercase: bool,
+    numbers: bool,
+    symbols: bool,
+}
 
 impl PasswordGenerator {
-    pub fn generate(length: usize, include_uppercase: bool, include_numbers: bool, include_symbols: bool) -> String {
-        let mut rng = rand::thread_rng();
-        let lowercase = "abcdefghijklmnopqrstuvwxyz";
-        let uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let numbers = "0123456789";
-        let symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
-
-        let mut charset = lowercase.to_string();
-        if include_uppercase {
-            charset.push_str(uppercase);
+    pub fn new() -> Self {
+        Self {
+            length: 16,
+            uppercase: true,
+            numbers: true,
+            symbols: true,
         }
-        if include_numbers {
-            charset.push_str(numbers);
-        }
-        if include_symbols {
-            charset.push_str(symbols);
-        }
-
-        let chars: Vec<char> = charset.chars().collect();
-        (0..length)
-            .map(|_| chars[rng.gen_range(0..chars.len())])
-            .collect()
     }
 
-    pub fn evaluate_strength(password: &str) -> String {
-        let has_lowercase = password.chars().any(|c| c.is_lowercase());
-        let has_uppercase = password.chars().any(|c| c.is_uppercase());
-        let has_numbers = password.chars().any(|c| c.is_numeric());
-        let has_symbols = password.chars().any(|c| !c.is_alphanumeric());
-        let length = password.len();
+    pub fn length(mut self, length: usize) -> Self {
+        self.length = length.clamp(8, 64);
+        self
+    }
 
-        let score = [has_lowercase, has_uppercase, has_numbers, has_symbols]
-            .iter()
-            .filter(|&&x| x)
-            .count() + (length / 8);
+    pub fn uppercase(mut self, uppercase: bool) -> Self {
+        self.uppercase = uppercase;
+        self
+    }
 
-        match score {
-            0..=2 => "Faible".to_string(),
-            3..=4 => "Moyen".to_string(),
-            5..=6 => "Fort".to_string(),
-            _ => "Très fort".to_string(),
+    pub fn numbers(mut self, numbers: bool) -> Self {
+        self.numbers = numbers;
+        self
+    }
+
+    pub fn symbols(mut self, symbols: bool) -> Self {
+        self.symbols = symbols;
+        self
+    }
+
+    pub fn generate(&self) -> String {
+        let mut charset: Vec<char> = ('a'..='z').collect();
+
+        if self.uppercase {
+            charset.extend('A'..='Z');
         }
+        if self.numbers {
+            charset.extend('0'..='9');
+        }
+        if self.symbols {
+            charset.extend("!@#$%^&*()_+-=[]{}|;:,.<>?".chars());
+        }
+
+        let mut rng = rand::thread_rng();
+        (0..self.length)
+            .map(|_| {
+                let idx = rng.gen_range(0..charset.len());
+                charset[idx]
+            })
+            .collect()
     }
 }
