@@ -15,9 +15,6 @@
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Usage](#usage)
-- [Security Features](#security-features)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -100,7 +97,7 @@ Build the project:
 cargo build --release
 ```
 
-Usage
+#### Usage
 First Run
 
 Launch SecureVault:
