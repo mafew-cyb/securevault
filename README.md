@@ -25,7 +25,6 @@ SecureVault is a **Rust-powered password management tool** that prioritizes secu
 ### Why Choose SecureVault?
 
 ✅ **Zero-Trust Architecture**: Your data never leaves your device
-✅ **Military-Grade Encryption**: AES-256-GCM for all stored data
 ✅ **Open Source**: Fully auditable codebase
 ✅ **Cross-Platform**: Works on Windows, macOS, and Linux
 ✅ **No Cloud Dependency**: All data stays local by default
@@ -35,8 +34,6 @@ SecureVault is a **Rust-powered password management tool** that prioritizes secu
 ## Features
 
 ### 🔐 Core Security
-- **AES-256-GCM Encryption** for all stored credentials
-- **Master Password Protection** with PBKDF2 key derivation
 - **Secure Memory Handling** to prevent cold boot attacks
 - **Clipboard Auto-Clear** after 30 seconds
 
